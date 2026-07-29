@@ -105,6 +105,8 @@ jobs:
           docker buildx build \
             images/base \
             --tag ghcr.io/${{ github.repository_owner }}/github-runner:base \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
             --push
 
   build-images:
@@ -136,4 +138,6 @@ jobs:
           docker buildx build \
             "${{ matrix.path }}" \
             --tag ghcr.io/${{ github.repository_owner }}/github-runner:$TAG \
+            --cache-from type=gha,scope=$TAG \
+            --cache-to type=gha,scope=$TAG,mode=max \
             --push
