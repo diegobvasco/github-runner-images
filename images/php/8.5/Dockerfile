@@ -8,4 +8,6 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y php8.5 php8.5-cli php8.5-mbstring
 
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 USER runner
