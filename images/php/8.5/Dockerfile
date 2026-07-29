@@ -6,7 +6,7 @@ RUN apt-get update && \
     apt-get install -y software-properties-common && \
     add-apt-repository ppa:ondrej/php && \
     apt-get update && \
-    apt-get install -y php8.5 php8.5-cli php8.5-mbstring php8.5-curl php8.5-xml
+    apt-get install -y php8.5 php8.5-cli php8.5-mbstring php8.5-curl php8.5-xml php8.5-pcov
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
