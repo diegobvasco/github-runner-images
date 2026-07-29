@@ -11,6 +11,8 @@ on:
     paths:
       - 'images/**'
 
+  workflow_dispatch:
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
