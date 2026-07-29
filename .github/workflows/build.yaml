@@ -36,11 +36,7 @@ jobs:
             HEAD="${{ github.sha }}"
           fi
 
-          if [[ "$BASE" == "0000000000000000000000000000000000000000" ]]; then
-            BASE=$(git rev-list --max-parents=0 HEAD)
-          fi
-
-          if [[ "$BASE" == "$HEAD" ]]; then
+          if [[ -z "$BASE" || "$BASE" == "0000000000000000000000000000000000000000" || "$BASE" == "$HEAD" ]]; then
             BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904
           fi
 
