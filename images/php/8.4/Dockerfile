@@ -13,6 +13,7 @@ RUN apt-get update && \
     php8.4-xml \
     php8.4-pcov \
     php8.4-mysql && \
+    php8.5-sqlite3 \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
