@@ -6,7 +6,8 @@ RUN apt-get update && \
     apt-get install -y software-properties-common && \
     add-apt-repository ppa:ondrej/php && \
     apt-get update && \
-    apt-get install -y php8.5 \
+    apt-get install -y \
+    php8.5 \
     php8.5-cli \
     php8.5-mbstring \
     php8.5-curl \
