@@ -37,12 +37,23 @@ RUN add-apt-repository ppa:ondrej/php && \
         apt-get install -y \
             php${version} \
             php${version}-cli \
+            php${version}-common \
+            php${version}-dev \
             php${version}-mbstring \
             php${version}-curl \
             php${version}-xml \
-            php${version}-pcov \
+            php${version}-zip \
+            php${version}-bcmath \
+            php${version}-intl \
+            php${version}-readline \
+            php${version}-opcache \
             php${version}-mysql \
-            php${version}-sqlite3 && \
+            php${version}-pgsql \
+            php${version}-sqlite3 \
+            php${version}-pcov \
+            php${version}-redis \
+            php${version}-xdebug \
+        && \
         update-alternatives --install \
             /usr/bin/php \
             php \
