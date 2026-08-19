@@ -3,6 +3,7 @@ FROM ghcr.io/diegobvasco/github-runner:base
 SHELL ["/bin/bash", "-c"]
 
 ARG PHP_VERSIONS="8.1 8.2 8.3 8.4 8.5"
+ARG PHP_EXTENSIONS="cli common dev mbstring curl xml zip bcmath intl readline opcache mysql pgsql sqlite3 pcov redis xdebug"
 
 USER root
 
@@ -34,25 +35,14 @@ RUN add-apt-repository ppa:ondrej/php && \
     apt-get update \
     && \
     for version in ${PHP_VERSIONS}; do \
-        apt-get install -y \
-            php${version} \
-            php${version}-cli \
-            php${version}-common \
-            php${version}-dev \
-            php${version}-mbstring \
-            php${version}-curl \
-            php${version}-xml \
-            php${version}-zip \
-            php${version}-bcmath \
-            php${version}-intl \
-            php${version}-readline \
-            php${version}-opcache \
-            php${version}-mysql \
-            php${version}-pgsql \
-            php${version}-sqlite3 \
-            php${version}-pcov \
-            php${version}-redis \
-            php${version}-xdebug \
+        packages="php${version}"; \
+        for extension in ${PHP_EXTENSIONS}; do \
+            package="php${version}-${extension}"; \
+            if apt-cache show "${package}" >/dev/null 2>&1; then \
+                packages="${packages} ${package}"; \
+            fi; \
+        done; \
+        apt-get install -y ${packages} \
         && \
         update-alternatives --install \
             /usr/bin/php \
