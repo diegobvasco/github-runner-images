@@ -2,7 +2,7 @@ FROM ghcr.io/diegobvasco/github-runner:base
 
 SHELL ["/bin/bash", "-c"]
 
-ARG PHP_VERSIONS="8.1 8.2 8.3 8.4 8.5"
+ARG PHP_VERSIONS="8.1 8.2 8.3 8.4 8.5 8.6"
 ARG PHP_EXTENSIONS="cli common dev mbstring curl xml zip bcmath intl readline opcache mysql pgsql sqlite3 pcov redis xdebug"
 
 USER root
