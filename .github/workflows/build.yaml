@@ -31,60 +31,18 @@ jobs:
           fetch-depth: 0
 
       - id: matrix
-        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.sha }}"
-          else
-            BASE="${{ github.event.before }}"
-            HEAD="${{ github.sha }}"
+          base="$BEFORE_SHA"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base="$PR_BASE_SHA"
           fi
 
-          if [[ -z "$BASE" || "$BASE" == "0000000000000000000000000000000000000000" || "$BASE" == "$HEAD" ]]; then
-            BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904
-          fi
-
-          declare -A images
-
-          while read -r file; do
-            [[ -z "$file" ]] && continue
-
-            if [[ "$file" =~ ^images/base/ ]]; then
-              while read -r dockerfile; do
-                images[$(dirname "$dockerfile")]=1
-              done < <(find images -name Dockerfile)
-            elif [[ "$file" =~ ^images/([^/]+)/([^/]+)/ ]]; then
-              dir="images/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-
-              if [[ -f "$dir/Dockerfile" ]]; then
-                images[$dir]=1
-              fi
-            fi
-          done < <(git diff --name-only "$BASE" "$HEAD")
-
-          has_base=false
-          image_list=()
-          for dir in $(printf '%s\n' "${!images[@]}" | sort); do
-            if [[ "$dir" == "images/base" ]]; then
-              has_base=true
-            else
-              image_list+=("$dir")
-            fi
-          done
-
-          images_json=$(
-            printf '%s\n' "${image_list[@]}" \
-              | sort \
-              | jq -R 'select(length > 0)' \
-              | jq -cs '{path: .}'
-          )
-
-          echo "has_base=$has_base"
-          echo "images=$images_json"
-
-          echo "has_base=$has_base" >> "$GITHUB_OUTPUT"
-          echo "images=$images_json" >> "$GITHUB_OUTPUT"
+          scripts/needs-build.sh --base "$base" --head "$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
   build-base:
     needs: prepare
@@ -108,14 +66,7 @@ jobs:
 
       - name: Build and export base image
         if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          docker build \
-            --tag "ghcr.io/${{ github.repository_owner }}/github-runner:base" \
-            images/base
-
-          docker save \
-            "ghcr.io/${{ github.repository_owner }}/github-runner:base" \
-            | gzip > "${RUNNER_TEMP}/base-image.tar.gz"
+        run: scripts/build-image.sh images/base --tag base --save "${RUNNER_TEMP}/base-image.tar.gz"
 
       - name: Upload base image artifact
         if: ${{ github.event_name == 'pull_request' }}
@@ -127,13 +78,7 @@ jobs:
 
       - name: Build and push base image
         if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          docker buildx build \
-            images/base \
-            --tag ghcr.io/${{ github.repository_owner }}/github-runner:base \
-            --cache-from type=gha \
-            --cache-to type=gha,mode=max \
-            --push
+        run: scripts/build-image.sh images/base --tag base --push
 
   build-images:
     needs: [prepare, build-base]
@@ -172,21 +117,8 @@ jobs:
 
       - name: Build image
         if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          TAG=$(echo "${{ matrix.path }}" | sed 's|^images/||' | tr -d '/')
-
-          docker build \
-            --tag "ghcr.io/${{ github.repository_owner }}/github-runner:$TAG" \
-            "${{ matrix.path }}"
+        run: scripts/build-image.sh "${{ matrix.path }}"
 
       - name: Build and push image
         if: ${{ github.event_name != 'pull_request' }}
-        run: |
-          TAG=$(echo "${{ matrix.path }}" | sed 's|^images/||' | tr -d '/')
-
-          docker buildx build \
-            "${{ matrix.path }}" \
-            --tag ghcr.io/${{ github.repository_owner }}/github-runner:$TAG \
-            --cache-from type=gha,scope=$TAG \
-            --cache-to type=gha,scope=$TAG,mode=max \
-            --push
+        run: scripts/build-image.sh "${{ matrix.path }}" --push
