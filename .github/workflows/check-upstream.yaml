@@ -24,94 +24,20 @@ jobs:
     outputs:
       changed: ${{ steps.check.outputs.changed }}
 
-    env:
-      OWNER: ${{ github.repository_owner }}
-
     steps:
+      - uses: actions/checkout@v4
+
       - name: Detect upstream image drift
         id: check
-        run: |
-          set -euo pipefail
-
-          # Print the rootfs layer digests (diff_ids) of the linux/amd64
-          # image behind a GHCR tag, using an anonymous pull token.
-          ghcr_layer_ids() {
-            local repo="$1" ref="$2"
-            local token index accept digest media_type manifest config_digest
-
-            accept='application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json'
-
-            token="$(curl -sfL "https://ghcr.io/token?scope=repository:${repo}:pull&service=ghcr.io" | jq -r '.token')"
-
-            index="$(curl -sfL \
-              -H "Authorization: Bearer ${token}" \
-              -H "Accept: ${accept}" \
-              "https://ghcr.io/v2/${repo}/manifests/${ref}")"
-
-            digest="$(jq -r 'first(.manifests[]? | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest) // empty' <<<"${index}")"
-
-            if [[ -n "${digest}" ]]; then
-              media_type="$(jq -r --arg digest "${digest}" 'first(.manifests[]? | select(.digest == $digest) | .mediaType)' <<<"${index}")"
-              manifest="$(curl -sfL \
-                -H "Authorization: Bearer ${token}" \
-                -H "Accept: ${media_type}" \
-                "https://ghcr.io/v2/${repo}/manifests/${digest}")"
-            else
-              # No index: the response itself is a single-platform manifest.
-              manifest="${index}"
-            fi
-
-            config_digest="$(jq -r '.config.digest' <<<"${manifest}")"
-            curl -sfL \
-              -H "Authorization: Bearer ${token}" \
-              "https://ghcr.io/v2/${repo}/blobs/${config_digest}" \
-              | jq -r '.rootfs.diff_ids[]'
-          }
-
-          upstream_layers="$(ghcr_layer_ids actions/actions-runner latest)"
-          if [[ -z "${upstream_layers}" ]]; then
-            echo "::error::Could not read layers of ghcr.io/actions/actions-runner:latest"
-            exit 1
-          fi
-
-          # Empty output means the published :base image does not exist yet.
-          ours_layers="$(ghcr_layer_ids "${OWNER}/github-runner" base || true)"
-
-          changed="false"
-          if [[ -z "${ours_layers}" ]]; then
-            echo "::notice::ghcr.io/${OWNER}/github-runner:base not found; scheduling a full build"
-            changed="true"
-          else
-            upstream_count="$(wc -l <<<"${upstream_layers}")"
-            ours_prefix="$(head -n "${upstream_count}" <<<"${ours_layers}")"
-            if [[ "${ours_prefix}" != "${upstream_layers}" ]]; then
-              changed="true"
-            fi
-          fi
-
-          fingerprint="$(printf '%s\n' "${upstream_layers}" | sha256sum | cut -d' ' -f1)"
-
-          echo "changed=${changed}" >> "${GITHUB_OUTPUT}"
-
-          echo "Upstream layers: $(wc -l <<<"${upstream_layers}")"
-          if [[ -n "${ours_layers}" ]]; then
-            echo "Published :base layers: $(wc -l <<<"${ours_layers}")"
-          fi
-          echo "Upstream fingerprint: ${fingerprint}"
-
-          if [[ "${changed}" == "true" ]]; then
-            echo "### ⬆️ Upstream runner image updated" >> "${GITHUB_STEP_SUMMARY}"
-            echo "" >> "${GITHUB_STEP_SUMMARY}"
-            echo "Base layers of \`ghcr.io/${OWNER}/github-runner:base\` no longer match \`ghcr.io/actions/actions-runner:latest\` (fingerprint \`${fingerprint:0:12}\`). Dispatching \`build.yaml\` to rebuild base and all dependent images." >> "${GITHUB_STEP_SUMMARY}"
-          else
-            echo "### ✅ Upstream runner image in sync" >> "${GITHUB_STEP_SUMMARY}"
-            echo "" >> "${GITHUB_STEP_SUMMARY}"
-            echo "\`ghcr.io/${OWNER}/github-runner:base\` already matches \`ghcr.io/actions/actions-runner:latest\` (fingerprint \`${fingerprint:0:12}\`)." >> "${GITHUB_STEP_SUMMARY}"
-          fi
+        env:
+          OWNER: ${{ github.repository_owner }}
+          FORCE: ${{ inputs.force }}
+        run: scripts/check-upstream.sh >> "$GITHUB_OUTPUT"
 
   rebuild:
     needs: check
-    if: ${{ needs.check.outputs.changed == 'true' || inputs.force == true }}
+    # --force is folded into the check script, which reports changed=true.
+    if: ${{ needs.check.outputs.changed == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
