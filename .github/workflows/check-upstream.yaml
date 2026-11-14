@@ -46,5 +46,6 @@ jobs:
       - name: Dispatch Build Images workflow
         env:
           GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           REF: ${{ github.ref_name }}
-        run: gh workflow run build.yaml --ref "${REF}"
+        run: gh workflow run build.yaml --repo "${REPO}" --ref "${REF}"
